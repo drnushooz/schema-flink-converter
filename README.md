@@ -2,7 +2,7 @@
 
 This project contains two modules as below
 
-* **converter** - The schema conversion RESTful service which can convert Avro, Protobuf and JSON 
+* **converter** - The schema conversion RESTful service which can convert Avro and JSON 
   schemas into equivalent Flink table definitions. There is built in support for Confluent Schema 
   registry.
 * **enum-enabled-avro-confluent** - A table format which is able to handle Avro `enum` fields
@@ -20,13 +20,12 @@ mvn clean package
 
 ### APIs
 
-The service exposes the following 4 APIs which
+The service exposes the following 3 APIs which
 
 | Method | Path                                      | Parameters                                               |
 |--------|-------------------------------------------|----------------------------------------------------------|
 | `POST` | `/fromavro`                               | Avro schema in the body                                  |
 | `POST` | `/fromjson`                               | JSON schema in the body                                  |
-| `POST` | `/fromprotobuf`                           | Protobuf schema in the body                              |
 | `PUT`  | `/fromregistry/<subjectname>/[<version>]` | Create table based on specific schema from the Registry. |
 
 ### Configuration properties

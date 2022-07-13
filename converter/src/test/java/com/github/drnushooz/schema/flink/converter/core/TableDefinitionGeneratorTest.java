@@ -72,20 +72,4 @@ public class TableDefinitionGeneratorTest {
         assertNotNull(tableSchema);
         assertEquals(result.getName(), "Person");
     }
-
-    @Test
-    void testGenerateFromProtobuf() throws DescriptorValidationException {
-        String protobufSchema = "message Subscriber {\n"
-            + "\t\trequired string first_name = 1;\n"
-            + "\t\trequired string last_name = 2;\n"
-            + "\t\trequired string address = 3;\n"
-            + "\t\toptional string city = 4;\n"
-            + "\t\toptional int32 zipcode = 5;\n"
-            + "\t\trepeated int32 department_codes = 6;\n"
-            + "\t}";
-        TableNameSchema result = TableDefinitionGenerator.generateFromProtobuf(protobufSchema);
-        Schema tableSchema = result.getSchema();
-        assertNotNull(tableSchema);
-        assertEquals(result.getName(), "Subscriber");
-    }
 }

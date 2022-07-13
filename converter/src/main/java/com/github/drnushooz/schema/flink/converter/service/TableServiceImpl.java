@@ -35,13 +35,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.PostConstruct;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
-import org.apache.flink.table.api.TableDescriptor;
 import org.apache.flink.table.api.TableEnvironment;
+import org.apache.flink.table.utils.EncodingUtils;
 import org.springframework.stereotype.Service;
 
 @RequiredArgsConstructor
@@ -87,17 +89,7 @@ public class TableServiceImpl implements TableService {
     }
 
     @Override
-    public TableNameSchema createFromProtobuf(String schema) throws DescriptorValidationException {
-        TableNameSchema tns = TableDefinitionGenerator.generateFromProtobuf(schema);
-        String tableFormat = getTableFormat("fromprotobuf", null);
-        Map<String, String> options = getConfiguration(tns.getName(), tableFormat, null);
-        createTable(tns.getName(), tns.getSchema(), options);
-        return tns;
-    }
-
-    @Override
-    public TableNameSchema createFromRegistry(String subjectName, Integer version)
-        throws RestClientException, IOException, DescriptorValidationException {
+    public TableNameSchema createFromRegistry(String subjectName, Integer version) throws RestClientException, IOException {
         io.confluent.kafka.schemaregistry.client.rest.entities.Schema
             schemaFromRegistry =
             Objects.requireNonNull(regClient.getSchemaFromRegistry(subjectName, version));
@@ -118,18 +110,20 @@ public class TableServiceImpl implements TableService {
     private void createTable(String tableName, Schema tableSchema,
         final Map<String, String> options) {
         ConverterConfiguration.Hive hive = convConf.getHive();
+        String snakeCaseTableName = cameToSnakeCase(tableName);
         String fullyQualifiedTableName =
-            hive.getCatalogName() + "." + hive.getDatabaseName() + "." + tableName;
-        TableDescriptor.Builder tDesc = TableDescriptor.forConnector("kafka").schema(tableSchema);
-        options.forEach(tDesc::option);
+            hive.getCatalogName() + ".`" + hive.getDatabaseName() + "`." + snakeCaseTableName;
+        String tableDefinition = schemaToTableDefinition(tableSchema, options);
+        String creationQuery = "CREATE TABLE " + fullyQualifiedTableName + " " + tableDefinition;
         TableEnvironment tEnv = tableEnv.get();
-        tEnv.createTable(fullyQualifiedTableName, tDesc.build());
+        tEnv.executeSql(creationQuery);
     }
 
     private Map<String, String> getConfiguration(final String tableName,
         final String tableFormat, final String schema) {
         ConverterConfiguration.Kafka kafka = convConf.getKafka();
         Map<String, String> options = new HashMap<>();
+        options.put("connector", "kafka");
         options.put("topic", tableName);
         options.put("value.format", tableFormat);
         options.put("scan.startup.mode", kafka.getScanStartupMode());
@@ -146,7 +140,7 @@ public class TableServiceImpl implements TableService {
             Optional.ofNullable(schema)
                 .ifPresent(s -> options.put(valueFormatPrefix + ".schema", s));
             if (registry.isEnabled()) {
-                options.put(valueFormatPrefix + ".url", registry.getUrl());
+                options.put(valueFormatPrefix + ".schema-registry.url", registry.getUrl());
                 options.put(
                     "properties.value.converter.enhanced." + tableFormat + ".schema.support",
                     String.valueOf(registry.isAdvancedSchemaSupportEnabled()));
@@ -258,5 +252,30 @@ public class TableServiceImpl implements TableService {
         }
 
         return tableFormat;
+    }
+
+    private String cameToSnakeCase(final String input) {
+        StringBuilder outputBuilder = new StringBuilder();
+        Stream<Character> inputChars = input.chars().mapToObj(i -> (char) i);
+        inputChars.forEachOrdered(ic -> {
+            if (Character.isUpperCase(ic)) {
+                outputBuilder.append('_').append(Character.toLowerCase(ic));
+            } else {
+                outputBuilder.append(ic);
+            }
+        });
+        return outputBuilder.deleteCharAt(0).toString();
+    }
+
+    String schemaToTableDefinition(Schema inputSchema, Map<String, String> options) {
+        String resolvedSchema = Optional.ofNullable(inputSchema).map(Schema::toString).orElse("");
+        String serializedOptions = options.entrySet().stream()
+            .map(
+                entry ->
+                    String.format("  '%s' = '%s'",
+                        EncodingUtils.escapeSingleQuotes(entry.getKey()),
+                        EncodingUtils.escapeSingleQuotes(entry.getValue())))
+            .collect(Collectors.joining(String.format(",%n")));
+        return String.format("%s%n WITH (%n%s%n)", resolvedSchema, serializedOptions);
     }
 }

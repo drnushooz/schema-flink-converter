@@ -25,7 +25,7 @@ under the License.
     <parent>
         <artifactId>schema-flink-converter</artifactId>
         <groupId>com.github.drnushooz</groupId>
-        <version>0.0.1-SNAPSHOT</version>
+        <version>0.0.2-SNAPSHOT</version>
     </parent>
 
     <artifactId>enum-enabled-avro-confluent</artifactId>

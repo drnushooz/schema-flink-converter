@@ -19,26 +19,22 @@
 package com.github.drnushooz.schema.flink.converter;
 
 import static com.github.drnushooz.schema.flink.converter.EnumEnabledAvroConfluentFormatOptions.SCHEMA;
-import static org.apache.flink.formats.avro.registry.confluent.AvroConfluentFormatOptions.BASIC_AUTH_CREDENTIALS_SOURCE;
-import static org.apache.flink.formats.avro.registry.confluent.AvroConfluentFormatOptions.BASIC_AUTH_USER_INFO;
-import static org.apache.flink.formats.avro.registry.confluent.AvroConfluentFormatOptions.BEARER_AUTH_CREDENTIALS_SOURCE;
-import static org.apache.flink.formats.avro.registry.confluent.AvroConfluentFormatOptions.BEARER_AUTH_TOKEN;
-import static org.apache.flink.formats.avro.registry.confluent.AvroConfluentFormatOptions.PROPERTIES;
-import static org.apache.flink.formats.avro.registry.confluent.AvroConfluentFormatOptions.SSL_KEYSTORE_LOCATION;
-import static org.apache.flink.formats.avro.registry.confluent.AvroConfluentFormatOptions.SSL_KEYSTORE_PASSWORD;
-import static org.apache.flink.formats.avro.registry.confluent.AvroConfluentFormatOptions.SSL_TRUSTSTORE_LOCATION;
-import static org.apache.flink.formats.avro.registry.confluent.AvroConfluentFormatOptions.SSL_TRUSTSTORE_PASSWORD;
-import static org.apache.flink.formats.avro.registry.confluent.AvroConfluentFormatOptions.SUBJECT;
-import static org.apache.flink.formats.avro.registry.confluent.AvroConfluentFormatOptions.URL;
+import static org.apache.flink.formats.avro.registry.confluent.RegistryAvroOptions.BASIC_AUTH_CREDENTIALS_SOURCE;
+import static org.apache.flink.formats.avro.registry.confluent.RegistryAvroOptions.BASIC_AUTH_USER_INFO;
+import static org.apache.flink.formats.avro.registry.confluent.RegistryAvroOptions.BEARER_AUTH_CREDENTIALS_SOURCE;
+import static org.apache.flink.formats.avro.registry.confluent.RegistryAvroOptions.BEARER_AUTH_TOKEN;
+import static org.apache.flink.formats.avro.registry.confluent.RegistryAvroOptions.SCHEMA_REGISTRY_SUBJECT;
+import static org.apache.flink.formats.avro.registry.confluent.RegistryAvroOptions.SCHEMA_REGISTRY_URL;
+import static org.apache.flink.formats.avro.registry.confluent.RegistryAvroOptions.SSL_KEYSTORE_LOCATION;
+import static org.apache.flink.formats.avro.registry.confluent.RegistryAvroOptions.SSL_KEYSTORE_PASSWORD;
+import static org.apache.flink.formats.avro.registry.confluent.RegistryAvroOptions.SSL_TRUSTSTORE_LOCATION;
+import static org.apache.flink.formats.avro.registry.confluent.RegistryAvroOptions.SSL_TRUSTSTORE_PASSWORD;
 
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-import javax.annotation.Nullable;
 import org.apache.avro.Schema;
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.common.serialization.DeserializationSchema;
@@ -55,10 +51,8 @@ import org.apache.flink.formats.avro.registry.confluent.ConfluentRegistryAvroSer
 import org.apache.flink.formats.avro.typeutils.AvroSchemaConverter;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.connector.ChangelogMode;
-import org.apache.flink.table.connector.Projection;
 import org.apache.flink.table.connector.format.DecodingFormat;
 import org.apache.flink.table.connector.format.EncodingFormat;
-import org.apache.flink.table.connector.format.ProjectableDecodingFormat;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.data.RowData;
@@ -80,57 +74,18 @@ public class EnumEnabledRegistryAvroFormatFactory
     implements DeserializationFormatFactory, SerializationFormatFactory {
     public static final String IDENTIFIER = "enum-enabled-avro-confluent";
 
-    public static @Nullable Map<String, String> buildOptionalPropertiesMap(
-        ReadableConfig formatOptions) {
-        final Map<String, String> properties = new HashMap<>();
-
-        formatOptions.getOptional(PROPERTIES).ifPresent(properties::putAll);
-
-        formatOptions
-            .getOptional(SSL_KEYSTORE_LOCATION)
-            .ifPresent(v -> properties.put("schema.registry.ssl.keystore.location", v));
-        formatOptions
-            .getOptional(SSL_KEYSTORE_PASSWORD)
-            .ifPresent(v -> properties.put("schema.registry.ssl.keystore.password", v));
-        formatOptions
-            .getOptional(SSL_TRUSTSTORE_LOCATION)
-            .ifPresent(v -> properties.put("schema.registry.ssl.truststore.location", v));
-        formatOptions
-            .getOptional(SSL_TRUSTSTORE_PASSWORD)
-            .ifPresent(v -> properties.put("schema.registry.ssl.truststore.password", v));
-        formatOptions
-            .getOptional(BASIC_AUTH_CREDENTIALS_SOURCE)
-            .ifPresent(v -> properties.put("basic.auth.credentials.source", v));
-        formatOptions
-            .getOptional(BASIC_AUTH_USER_INFO)
-            .ifPresent(v -> properties.put("basic.auth.user.info", v));
-        formatOptions
-            .getOptional(BEARER_AUTH_CREDENTIALS_SOURCE)
-            .ifPresent(v -> properties.put("bearer.auth.credentials.source", v));
-        formatOptions
-            .getOptional(BEARER_AUTH_TOKEN)
-            .ifPresent(v -> properties.put("bearer.auth.token", v));
-
-        if (properties.isEmpty()) {
-            return null;
-        }
-        return properties;
-    }
-
     @Override
     public DecodingFormat<DeserializationSchema<RowData>> createDecodingFormat(
         Context context, ReadableConfig formatOptions) {
         FactoryUtil.validateFactoryOptions(this, formatOptions);
 
-        String schemaRegistryURL = formatOptions.get(URL);
+        String schemaRegistryURL = formatOptions.get(SCHEMA_REGISTRY_URL);
         Map<String, ?> optionalPropertiesMap = buildOptionalPropertiesMap(formatOptions);
 
-        return new ProjectableDecodingFormat<DeserializationSchema<RowData>>() {
+        return new DecodingFormat<DeserializationSchema<RowData>>() {
             @Override
             public DeserializationSchema<RowData> createRuntimeDecoder(
-                DynamicTableSource.Context context, DataType producedDataType,
-                int[][] projections) {
-                producedDataType = Projection.of(projections).project(producedDataType);
+                DynamicTableSource.Context context, DataType producedDataType) {
                 final RowType rowType = (RowType) producedDataType.getLogicalType();
                 Schema rowSchema = formatOptions.getOptional(SCHEMA).map(new Schema.Parser()::parse)
                     .orElseGet(() -> AvroSchemaConverter.convertToSchema(rowType));
@@ -154,15 +109,15 @@ public class EnumEnabledRegistryAvroFormatFactory
         DynamicTableFactory.Context context, ReadableConfig formatOptions) {
         FactoryUtil.validateFactoryOptions(this, formatOptions);
 
-        String schemaRegistryURL = formatOptions.get(URL);
-        Optional<String> subject = formatOptions.getOptional(SUBJECT);
+        String schemaRegistryURL = formatOptions.get(SCHEMA_REGISTRY_URL);
+        Optional<String> subject = formatOptions.getOptional(SCHEMA_REGISTRY_SUBJECT);
         Map<String, ?> optionalPropertiesMap = buildOptionalPropertiesMap(formatOptions);
 
         if (!subject.isPresent()) {
             throw new ValidationException(
                 String.format(
                     "Option %s.%s is required for serialization",
-                    IDENTIFIER, SUBJECT.key()));
+                    IDENTIFIER, SCHEMA_REGISTRY_SUBJECT.key()));
         }
 
         return new EncodingFormat<SerializationSchema<RowData>>() {
@@ -195,7 +150,7 @@ public class EnumEnabledRegistryAvroFormatFactory
     @Override
     public Set<ConfigOption<?>> requiredOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
-        options.add(URL);
+        options.add(SCHEMA_REGISTRY_URL);
         return options;
     }
 
@@ -203,8 +158,7 @@ public class EnumEnabledRegistryAvroFormatFactory
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(SCHEMA);
-        options.add(SUBJECT);
-        options.add(PROPERTIES);
+        options.add(SCHEMA_REGISTRY_SUBJECT);
         options.add(SSL_KEYSTORE_LOCATION);
         options.add(SSL_KEYSTORE_PASSWORD);
         options.add(SSL_TRUSTSTORE_LOCATION);
@@ -216,20 +170,34 @@ public class EnumEnabledRegistryAvroFormatFactory
         return options;
     }
 
-    @Override
-    public Set<ConfigOption<?>> forwardOptions() {
-        return Stream.of(
-                URL,
-                SUBJECT,
-                PROPERTIES,
-                SSL_KEYSTORE_LOCATION,
-                SSL_KEYSTORE_PASSWORD,
-                SSL_TRUSTSTORE_LOCATION,
-                SSL_TRUSTSTORE_PASSWORD,
-                BASIC_AUTH_CREDENTIALS_SOURCE,
-                BASIC_AUTH_USER_INFO,
-                BEARER_AUTH_CREDENTIALS_SOURCE,
-                BEARER_AUTH_TOKEN)
-            .collect(Collectors.toSet());
+    private Map<String, String> buildOptionalPropertiesMap(ReadableConfig formatOptions) {
+        final Map<String, String> properties = new HashMap<>();
+
+        formatOptions
+            .getOptional(SSL_KEYSTORE_LOCATION)
+            .ifPresent(v -> properties.put("schema.registry.ssl.keystore.location", v));
+        formatOptions
+            .getOptional(SSL_KEYSTORE_PASSWORD)
+            .ifPresent(v -> properties.put("schema.registry.ssl.keystore.password", v));
+        formatOptions
+            .getOptional(SSL_TRUSTSTORE_LOCATION)
+            .ifPresent(v -> properties.put("schema.registry.ssl.truststore.location", v));
+        formatOptions
+            .getOptional(SSL_TRUSTSTORE_PASSWORD)
+            .ifPresent(v -> properties.put("schema.registry.ssl.truststore.password", v));
+        formatOptions
+            .getOptional(BASIC_AUTH_CREDENTIALS_SOURCE)
+            .ifPresent(v -> properties.put("basic.auth.credentials.source", v));
+        formatOptions
+            .getOptional(BASIC_AUTH_USER_INFO)
+            .ifPresent(v -> properties.put("basic.auth.user.info", v));
+        formatOptions
+            .getOptional(BEARER_AUTH_CREDENTIALS_SOURCE)
+            .ifPresent(v -> properties.put("bearer.auth.credentials.source", v));
+        formatOptions
+            .getOptional(BEARER_AUTH_TOKEN)
+            .ifPresent(v -> properties.put("bearer.auth.token", v));
+
+        return properties;
     }
 }

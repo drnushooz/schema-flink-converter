@@ -90,31 +90,6 @@ public class TableCreationController {
         });
     }
 
-    @PostMapping("/fromprotobuf")
-    public Mono<ResponseEntity<ResponseBody>> fromProtobuf(@RequestBody String requestSchema) {
-        Mono<String> requestSchemaMono = Mono.just(requestSchema);
-        Mono<TableNameSchema> tnsMono =
-            requestSchemaMono.subscribeOn(CommonScheduler.getInstance()).flatMap(rs -> {
-                try {
-                    return Mono.just(tableService.createFromProtobuf(rs));
-                } catch (Exception e) {
-                    return Mono.error(e);
-                }
-            });
-        return tnsMono.map(tns -> {
-            ResponseBody rb = new ResponseBody(RequestMethod.POST.name(), "/fromprotobuf",
-                tns.getSchema().toString());
-            return ResponseEntity.ok(rb);
-        }).onErrorResume(ex -> {
-            log.error(
-                "Error in processing request " + RequestMethod.POST.name() + " /fromprotobuf" + " "
-                    + requestSchema, ex);
-            ResponseBody rb = new ResponseBody(RequestMethod.POST.name(), "/fromprotobuf",
-                "Error in processing request: " + ex.getLocalizedMessage());
-            return Mono.just(ResponseEntity.badRequest().body(rb));
-        });
-    }
-
     @PutMapping(value = {"/fromregistry/{subjectName}", "/fromregistry/{subjectName}/{version}"})
     public Mono<ResponseEntity<ResponseBody>> fromRegistry(@PathVariable String subjectName,
         @PathVariable(required = false) Integer version) {

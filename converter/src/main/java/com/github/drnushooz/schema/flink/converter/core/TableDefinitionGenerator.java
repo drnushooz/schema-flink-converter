@@ -23,12 +23,6 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.drnushooz.schema.flink.converter.model.TableNameSchema;
-import com.google.protobuf.Descriptors.Descriptor;
-import com.google.protobuf.Descriptors.DescriptorValidationException;
-import com.google.protobuf.Descriptors.FileDescriptor;
-import com.squareup.wire.schema.internal.parser.ProtoFileElement;
-import com.squareup.wire.schema.internal.parser.ProtoParser;
-import io.apicurio.registry.utils.protobuf.schema.FileDescriptorUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.flink.formats.avro.typeutils.AvroSchemaConverter;
 import org.apache.flink.formats.json.JsonRowSchemaConverter;
@@ -69,31 +63,9 @@ public class TableDefinitionGenerator {
         return new TableNameSchema(title, tSchema);
     }
 
-    /**
-     * Generate Flink SQL table definition based on Protobuf schema.
-     */
-    public static TableNameSchema generateFromProtobuf(String schema)
-        throws DescriptorValidationException {
-        ProtoFileElement fileElement =
-            ProtoParser.Companion.parse(FileDescriptorUtils.DEFAULT_LOCATION, schema);
-        FileDescriptor fileDescriptor = FileDescriptorUtils.protoFileToFileDescriptor(fileElement);
-        int messageDescriptorCount = fileDescriptor.getMessageTypes().size();
-        if (messageDescriptorCount > 1) {
-            IllegalArgumentException iae = new IllegalArgumentException(
-                "There should be only one outermost message type, found " + messageDescriptorCount);
-            log.error("Error in parsing protobuf schema", iae);
-            throw iae;
-        }
-
-        Descriptor outermostMessageType = fileDescriptor.getMessageTypes().get(0);
-        DataType flinkDataType = ProtobufUtils.protobufToFlinkDataType(outermostMessageType);
-        Schema tSchema = Schema.newBuilder().fromRowDataType(flinkDataType).build();
-        return new TableNameSchema(outermostMessageType.getName(), tSchema);
-    }
-
     public static TableNameSchema generateFromRegistry(
         io.confluent.kafka.schemaregistry.client.rest.entities.Schema schemaFromRegistry)
-        throws DescriptorValidationException, JsonProcessingException {
+        throws JsonProcessingException {
         String schemaType = schemaFromRegistry.getSchemaType();
         switch (schemaType) {
             case "AVRO":
@@ -103,7 +75,7 @@ public class TableDefinitionGenerator {
                 return generateFromJSON(schemaFromRegistry.getSchema());
 
             case "PROTOBUF":
-                return generateFromProtobuf(schemaFromRegistry.getSchema());
+                throw new IllegalArgumentException("Protobuf schemas are not supported");
 
             default:
                 throw new IllegalArgumentException("Found invalid schema type: " + schemaType);

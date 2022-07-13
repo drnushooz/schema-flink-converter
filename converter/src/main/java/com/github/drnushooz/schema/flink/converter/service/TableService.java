@@ -20,7 +20,6 @@ package com.github.drnushooz.schema.flink.converter.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.github.drnushooz.schema.flink.converter.model.TableNameSchema;
-import com.google.protobuf.Descriptors.DescriptorValidationException;
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
 import java.io.IOException;
 
@@ -29,8 +28,5 @@ public interface TableService {
 
     TableNameSchema createFromJSON(String schema) throws JsonProcessingException;
 
-    TableNameSchema createFromProtobuf(String schema) throws DescriptorValidationException;
-
-    TableNameSchema createFromRegistry(String subjectName, Integer version)
-        throws RestClientException, IOException, DescriptorValidationException;
+    TableNameSchema createFromRegistry(String subjectName, Integer version) throws RestClientException, IOException;
 }

@@ -20,13 +20,16 @@ package com.github.drnushooz.schema.flink.converter.core;
 
 import com.github.drnushooz.schema.flink.converter.config.ConverterConfiguration;
 import java.util.Collections;
+import java.util.Optional;
 import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.catalog.CatalogDatabaseImpl;
+import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.DatabaseAlreadyExistException;
 import org.apache.flink.table.catalog.hive.HiveCatalog;
 import org.springframework.context.annotation.Lazy;
@@ -43,17 +46,20 @@ public class CommonTableEnvironment {
     private final ConverterConfiguration convConf;
 
     private TableEnvironment tableEnv;
+    private Catalog hiveCatalog;
 
     @PostConstruct
     public void init() {
         ConverterConfiguration.Hive hive = convConf.getHive();
         String hiveDatabaseName = hive.getDatabaseName();
         String hiveCatalogName = hive.getCatalogName();
-        Catalog hiveCatalog =
+        hiveCatalog =
             new HiveCatalog(hiveCatalogName, hiveDatabaseName, hive.getConfigDir(),
                 convConf.getHadoop().getConfigDir(),
                 null);
-        tableEnv = TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+        EnvironmentSettings envSettings =
+            EnvironmentSettings.newInstance().inStreamingMode().build();
+        tableEnv = TableEnvironment.create(envSettings);
         tableEnv.registerCatalog(hiveCatalogName, hiveCatalog);
         try {
             hiveCatalog.createDatabase(hiveDatabaseName,
@@ -65,5 +71,10 @@ public class CommonTableEnvironment {
 
     public TableEnvironment get() {
         return tableEnv;
+    }
+
+    @PreDestroy
+    public void destroy() {
+        hiveCatalog.close();
     }
 }
